@@ -1372,10 +1372,25 @@ function StockIntrants({ stock, setStock }) {
 
 // ===================== CERTIFICATION =====================
 function Certification() {
-  const certif = CERTIF_INIT;
+  const [certif, setCertif] = useState(CERTIF_INIT);
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState(CERTIF_INIT);
   const today = new Date();
   const audit = new Date(certif.date_prochain_audit);
   const jours = Math.ceil((audit - today) / (1000*60*60*24));
+
+  const ouvrirEdition = () => {
+    setForm({ ...certif, productionsTexte: certif.productions.join(', ') });
+    setModal(true);
+  };
+
+  const enregistrer = () => {
+    setCertif({
+      ...form,
+      productions: form.productionsTexte.split(',').map(p => p.trim()).filter(Boolean)
+    });
+    setModal(false);
+  };
 
   const DOCS_AUDIT = [
     { nom: "Registre des interventions phytosanitaires", fait: true },
@@ -1395,7 +1410,10 @@ function Certification() {
         <div className="card">
           <div className="card-header">
             <div className="card-title">🏆 Ma certification AB</div>
-            <span className="badge badge-ab">✅ Valide</span>
+            <div style={{display:'flex', gap:8, alignItems:'center'}}>
+              <span className="badge badge-ab">✅ Valide</span>
+              <button className="btn btn-outline btn-sm" onClick={ouvrirEdition}>✏️ Modifier</button>
+            </div>
           </div>
           <div className="card-body">
             <div className="certif-card">
@@ -1461,6 +1479,45 @@ function Certification() {
           </tbody>
         </table>
       </div>
+
+      {modal && (
+        <Modal title="✏️ Modifier la certification AB" onClose={()=>setModal(false)}
+          footer={<><button className="btn btn-outline" onClick={()=>setModal(false)}>Annuler</button><button className="btn btn-primary" onClick={enregistrer}>Enregistrer</button></>}>
+          <div className="form-grid">
+            <div className="form-row">
+              <div className="form-group">
+                <label>Organisme certificateur</label>
+                <select value={form.organisme} onChange={e=>setForm({...form,organisme:e.target.value})}>
+                  <option>Ecocert</option>
+                  <option>Bureau Veritas</option>
+                  <option>Certipaq</option>
+                  <option>Afocert</option>
+                  <option>Ocacia</option>
+                  <option>Autre</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Numéro de certification</label>
+                <input value={form.numero} onChange={e=>setForm({...form,numero:e.target.value})} placeholder="Ex: FR-BIO-01-2342" />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Date de début de certification</label>
+                <input type="date" value={form.date_debut} onChange={e=>setForm({...form,date_debut:e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Date du prochain audit</label>
+                <input type="date" value={form.date_prochain_audit} onChange={e=>setForm({...form,date_prochain_audit:e.target.value})} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Productions certifiées (séparées par des virgules)</label>
+              <input value={form.productionsTexte} onChange={e=>setForm({...form,productionsTexte:e.target.value})} placeholder="Ex: Grandes cultures, Maraîchage" />
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
