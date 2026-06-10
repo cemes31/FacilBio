@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FacilBio – Gestion Agriculture Biologique</title>
+<title>FacilBio – Démo Test – Gestion Agriculture Biologique</title>
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -555,6 +555,53 @@
 
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* ÉCRAN MOT DE PASSE */
+  .pwd-screen {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1a3a2a 0%, #2d5a3d 60%, #4a8c5c 100%);
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .pwd-card {
+    background: white; border-radius: 20px; padding: 40px;
+    width: 100%; max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;
+  }
+  .pwd-logo { font-family: 'Playfair Display', serif; font-size: 2.2rem; color: #1a3a2a; margin-bottom: 4px; }
+  .pwd-logo span { color: #4a8c5c; }
+  .pwd-subtitle { font-size: 0.8rem; color: #888; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 24px; }
+  .demo-warning-pwd {
+    background: #fff8e1; border: 2px solid #f9a825; border-radius: 10px;
+    padding: 14px; margin-bottom: 24px; font-size: 0.8rem; color: #5d4037;
+    line-height: 1.5; text-align: left;
+  }
+  .demo-warning-pwd strong { color: #e65100; }
+  .pwd-input-wrap { margin-bottom: 16px; }
+  .pwd-input-wrap input {
+    width: 100%; padding: 12px 16px; font-size: 1rem;
+    border: 2px solid #e0e0e0; border-radius: 10px;
+    text-align: center; letter-spacing: 4px; font-family: 'DM Sans', sans-serif;
+  }
+  .pwd-input-wrap input:focus { border-color: #4a8c5c; outline: none; }
+  .pwd-error { color: #c0392b; font-size: 0.82rem; margin-bottom: 12px; min-height: 20px; }
+  .pwd-btn {
+    width: 100%; padding: 13px; background: #2d5a3d; color: white;
+    border: none; border-radius: 10px; font-size: 1rem; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.2s;
+  }
+  .pwd-btn:hover { background: #1a3a2a; }
+  .pwd-footer { margin-top: 20px; font-size: 0.75rem; color: #aaa; }
+  /* BANDEAU DÉMO */
+  .demo-banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+    background: linear-gradient(90deg, #e65100, #f57f17);
+    color: white; text-align: center; padding: 8px 16px;
+    font-size: 0.78rem; font-weight: 600; letter-spacing: 0.3px;
+    line-height: 1.4; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .sidebar { top: 38px !important; height: calc(100vh - 38px) !important; }
+  .topbar { top: 38px !important; }
+  .main { padding-top: 38px; }
 </style>
 </head>
 <body>
@@ -1318,7 +1365,46 @@ const MODULES = [
   { id: 'conseiller', label: 'Conseiller IA', icon: '🤖' },
 ];
 
+function EcranMotDePasse({ onAcces }) {
+  const [mdp, setMdp] = React.useState('');
+  const [erreur, setErreur] = React.useState('');
+  const verifier = () => {
+    if (mdp.trim() === 'DEMO2025') { onAcces(); }
+    else { setErreur('Code incorrect. Veuillez réessayer.'); setMdp(''); }
+  };
+  return (
+    <div className="pwd-screen">
+      <div className="pwd-card">
+        <div className="pwd-logo">Facil<span>Bio</span></div>
+        <div className="pwd-subtitle">Version Démo – Accès restreint</div>
+        <div className="demo-warning-pwd">
+          <strong>⚠️ DÉMO EN COURS DE TEST</strong><br/>
+          Cette application est une version de démonstration non finalisée.<br/><br/>
+          Les données saisies ne sont pas sauvegardées. Facil'Gestion31 <strong>décline toute responsabilité</strong> quant à l'utilisation des informations présentées. Les données réglementaires sont fournies à titre indicatif uniquement.
+        </div>
+        <div className="pwd-input-wrap">
+          <input
+            type="password"
+            placeholder="Code d'accès"
+            value={mdp}
+            onChange={e => { setMdp(e.target.value); setErreur(''); }}
+            onKeyDown={e => e.key === 'Enter' && verifier()}
+            autoFocus
+          />
+        </div>
+        <div className="pwd-error">{erreur}</div>
+        <button className="pwd-btn" onClick={verifier}>Accéder à la démo →</button>
+        <div className="pwd-footer">
+          Facil'Gestion31 · Application en développement<br/>
+          Contactez cendrine@facilgestion31.fr pour un accès testeur
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
+  const [accesAutorise, setAccesAutorise] = React.useState(false);
   const [module, setModule] = useState('dashboard');
   const [parcelles, setParcelles] = useState(PARCELLES_INIT);
   const [interventions, setInterventions] = useState(INTERVENTIONS_INIT);
@@ -1332,8 +1418,13 @@ function App() {
     conseiller: 'Conseiller IA',
   };
 
+  if (!accesAutorise) return <EcranMotDePasse onAcces={() => setAccesAutorise(true)} />;
+
   return (
     <div>
+      <div className="demo-banner">
+        ⚠️ VERSION DÉMO – Application en cours de développement – Données non sauvegardées – Facil'Gestion31 ne peut être tenu responsable de l'utilisation de cette démo
+      </div>
       <aside className="sidebar">
         <div className="logo-zone">
           <div className="logo-title">Facil<span>Bio</span></div>
