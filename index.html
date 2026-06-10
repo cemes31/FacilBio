@@ -666,6 +666,19 @@ const CERTIF_INIT = {
   productions: ["Grandes cultures", "Maraîchage"],
 };
 
+const DOCS_AUDIT_INIT = [
+  { id: 1, nom: "Registre des interventions phytosanitaires", fait: true },
+  { id: 2, nom: "Registre des fertilisants utilisés", fait: true },
+  { id: 3, nom: "Cahier de récolte et de stockage", fait: false },
+  { id: 4, nom: "Factures/BL des intrants de l'année", fait: false },
+  { id: 5, nom: "Contrats de vente (traçabilité aval)", fait: true },
+  { id: 6, nom: "Carte des parcelles (TéléPAC / CartoBio)", fait: true },
+  { id: 7, nom: "Registre de nettoyage des équipements", fait: false },
+  { id: 8, nom: "Registre d'entrée/sortie des animaux (si élevage)", fait: false },
+  { id: 9, nom: "Plan de fumure / cahier de fertilisation", fait: false },
+  { id: 10, nom: "Justificatifs de formation Bio (le cas échéant)", fait: false },
+];
+
 // ===================== COMPOSANTS COMMUNS =====================
 function Modal({ title, onClose, children, footer }) {
   return (
@@ -683,12 +696,22 @@ function Modal({ title, onClose, children, footer }) {
 }
 
 // ===================== DASHBOARD =====================
-function Dashboard({ parcelles, interventions }) {
+function Dashboard({ parcelles, interventions, certif, docsAudit }) {
   const surfaceCertif = parcelles.filter(p => p.statut === "certifie").reduce((s, p) => s + p.surface, 0);
   const surfaceConv = parcelles.filter(p => p.statut === "conversion").reduce((s, p) => s + p.surface, 0);
   const today = new Date();
-  const prochainAudit = new Date("2026-01-15");
+  const prochainAudit = new Date(certif.date_prochain_audit);
   const joursAudit = Math.ceil((prochainAudit - today) / (1000*60*60*24));
+  const docsRestants = docsAudit.filter(d => !d.fait).length;
+  const parcellesEnConversion = parcelles.filter(p => p.statut === "conversion");
+
+  // Calcul de la fin de conversion (2 ans) pour chaque parcelle en conversion
+  const getFinConversionInfo = (debut) => {
+    const d = new Date(debut);
+    d.setFullYear(d.getFullYear() + 2);
+    const moisRestants = Math.round((d - today) / (1000*60*60*24*30));
+    return { date: d, moisRestants };
+  };
 
   return (
     <div>
@@ -715,7 +738,7 @@ function Dashboard({ parcelles, interventions }) {
           <div className="stat-emoji">📋</div>
           <div className="stat-val">{joursAudit}j</div>
           <div className="stat-label">Avant prochain audit</div>
-          <div className="stat-sub">Ecocert – Jan. 2026</div>
+          <div className="stat-sub">{certif.organisme} – {new Date(certif.date_prochain_audit).toLocaleDateString('fr-FR', {month:'long', year:'numeric'})}</div>
         </div>
       </div>
 
@@ -756,26 +779,40 @@ function Dashboard({ parcelles, interventions }) {
             </div>
             <div className="card-body">
               <div className="alert-item">
-                <div className="alert-dot rouge"></div>
+                <div className={`alert-dot ${joursAudit < 30 ? 'rouge' : joursAudit < 90 ? 'orange' : 'vert'}`}></div>
                 <div>
-                  <div className="alert-text">Audit Ecocert dans {joursAudit} jours — préparez vos documents</div>
-                  <div className="alert-date">15 janvier 2026</div>
+                  <div className="alert-text">
+                    {joursAudit >= 0
+                      ? `Audit ${certif.organisme} dans ${joursAudit} jours — ${docsRestants} document(s) restant(s) à préparer`
+                      : `Audit ${certif.organisme} en retard de ${Math.abs(joursAudit)} jours — à reprogrammer`}
+                  </div>
+                  <div className="alert-date">{new Date(certif.date_prochain_audit).toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'})}</div>
                 </div>
               </div>
-              <div className="alert-item">
-                <div className="alert-dot orange"></div>
-                <div>
-                  <div className="alert-text">Champ du Moulin — fin de conversion dans 9 mois</div>
-                  <div className="alert-date">Mars 2026</div>
+
+              {parcellesEnConversion.map(p => {
+                const info = getFinConversionInfo(p.debut_conversion);
+                return (
+                  <div className="alert-item" key={p.id}>
+                    <div className={`alert-dot ${info.moisRestants <= 3 ? 'rouge' : info.moisRestants <= 6 ? 'orange' : 'vert'}`}></div>
+                    <div>
+                      <div className="alert-text">
+                        {p.nom} — fin de conversion {info.moisRestants > 0 ? `dans ${info.moisRestants} mois` : 'atteinte'}
+                      </div>
+                      <div className="alert-date">{info.date.toLocaleDateString('fr-FR', {month:'long', year:'numeric'})}</div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {parcellesEnConversion.length === 0 && joursAudit >= 0 && docsRestants === 0 && (
+                <div className="alert-item">
+                  <div className="alert-dot vert"></div>
+                  <div>
+                    <div className="alert-text">Tout est à jour, aucune alerte particulière 👍</div>
+                  </div>
                 </div>
-              </div>
-              <div className="alert-item">
-                <div className="alert-dot vert"></div>
-                <div>
-                  <div className="alert-text">Certiphyto à renouveler (optionnel en AB)</div>
-                  <div className="alert-date">Juin 2026</div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -1371,8 +1408,7 @@ function StockIntrants({ stock, setStock }) {
 }
 
 // ===================== CERTIFICATION =====================
-function Certification() {
-  const [certif, setCertif] = useState(CERTIF_INIT);
+function Certification({ certif, setCertif, docsAudit, setDocsAudit }) {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(CERTIF_INIT);
   const today = new Date();
@@ -1392,17 +1428,11 @@ function Certification() {
     setModal(false);
   };
 
-  const DOCS_AUDIT = [
-    { nom: "Registre des interventions phytosanitaires", fait: true },
-    { nom: "Registre des fertilisants utilisés", fait: true },
-    { nom: "Cahier de récolte et de stockage", fait: false },
-    { nom: "Factures/BL des intrants de l'année", fait: false },
-    { nom: "Contrats de vente (traçabilité aval)", fait: true },
-    { nom: "Carte des parcelles (TéléPAC / CartoBio)", fait: true },
-    { nom: "Registre de nettoyage des équipements", fait: false },
-  ];
+  const toggleDoc = (id) => {
+    setDocsAudit(docsAudit.map(d => d.id === id ? { ...d, fait: !d.fait } : d));
+  };
 
-  const faitCount = DOCS_AUDIT.filter(d => d.fait).length;
+  const faitCount = docsAudit.filter(d => d.fait).length;
 
   return (
     <div>
@@ -1435,17 +1465,17 @@ function Certification() {
         <div className="card">
           <div className="card-header">
             <div className="card-title">📋 Préparation audit</div>
-            <span className="badge badge-conv">{faitCount}/{DOCS_AUDIT.length} docs</span>
+            <span className="badge badge-conv">{faitCount}/{docsAudit.length} docs</span>
           </div>
           <div className="card-body">
             <div className="conv-bar-wrap" style={{marginBottom:12}}>
-              <div className="conv-bar" style={{width:`${faitCount/DOCS_AUDIT.length*100}%`}}></div>
+              <div className="conv-bar" style={{width:`${faitCount/docsAudit.length*100}%`}}></div>
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {DOCS_AUDIT.map((d,i) => (
-                <div key={i} style={{display:'flex',alignItems:'center',gap:10,fontSize:'0.85rem'}}>
+              {docsAudit.map((d) => (
+                <div key={d.id} style={{display:'flex',alignItems:'center',gap:10,fontSize:'0.85rem',cursor:'pointer'}} onClick={()=>toggleDoc(d.id)}>
                   <span style={{fontSize:'1rem'}}>{d.fait ? '✅' : '⬜'}</span>
-                  <span style={{color: d.fait ? 'var(--gris-texte)' : '#999', textDecoration: d.fait ? 'none' : 'none'}}>{d.nom}</span>
+                  <span style={{color: d.fait ? 'var(--gris-texte)' : '#999'}}>{d.nom}</span>
                 </div>
               ))}
             </div>
@@ -1736,6 +1766,8 @@ function App() {
   const [parcelles, setParcelles] = useState(PARCELLES_INIT);
   const [interventions, setInterventions] = useState(INTERVENTIONS_INIT);
   const [stock, setStock] = useState(STOCK_INIT);
+  const [certif, setCertif] = useState(CERTIF_INIT);
+  const [docsAudit, setDocsAudit] = useState(DOCS_AUDIT_INIT);
 
   const titres = {
     dashboard: 'Tableau de bord',
@@ -1783,11 +1815,11 @@ function App() {
           </div>
         </div>
         <div className="content">
-          {module === 'dashboard' && <Dashboard parcelles={parcelles} interventions={interventions} />}
+          {module === 'dashboard' && <Dashboard parcelles={parcelles} interventions={interventions} certif={certif} docsAudit={docsAudit} />}
           {module === 'parcelles' && <Parcelles parcelles={parcelles} setParcelles={setParcelles} />}
           {module === 'intrants' && <RegistreIntrants interventions={interventions} setInterventions={setInterventions} parcelles={parcelles} stock={stock} setStock={setStock} />}
           {module === 'stock' && <StockIntrants stock={stock} setStock={setStock} />}
-          {module === 'certification' && <Certification />}
+          {module === 'certification' && <Certification certif={certif} setCertif={setCertif} docsAudit={docsAudit} setDocsAudit={setDocsAudit} />}
           {module === 'aides' && <AidesPAC />}
           {module === 'conseiller' && <ConseillerIA />}
         </div>
