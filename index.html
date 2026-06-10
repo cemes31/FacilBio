@@ -643,11 +643,29 @@ const INTERVENTIONS_INIT = [
   { id: 2, date: "2025-04-28", parcelle: "Les Terrasses", culture: "Vigne", produit: "Soufre mouillable", dose: "5 kg/ha", objectif: "Oïdium vigne", operateur: "Jean Martin" },
 ];
 
+// Stock généré automatiquement à partir des produits AB (INTRANTS_AB) et fertilisants (FERTILISANTS)
+// Quantités initiales à 0 = à compléter par l'utilisateur, sauf exemples pré-remplis
 const STOCK_INIT = [
-  { id: 1, produit: "Bouillie bordelaise", categorie: "Fongicide", quantite: 25, unite: "kg", seuil_alerte: 10, fournisseur: "Coopérative Bio Sud", date_achat: "2025-03-15" },
-  { id: 2, produit: "Soufre mouillable", categorie: "Fongicide", quantite: 8, unite: "kg", seuil_alerte: 10, fournisseur: "Agrobio Distribution", date_achat: "2025-02-20" },
-  { id: 3, produit: "Pyrèthre naturel", categorie: "Insecticide", quantite: 5, unite: "L", seuil_alerte: 2, fournisseur: "Coopérative Bio Sud", date_achat: "2025-04-10" },
-  { id: 4, produit: "Compost végétal", categorie: "Fertilisant", quantite: 1200, unite: "kg", seuil_alerte: 200, fournisseur: "Compostière Régionale", date_achat: "2025-01-05" },
+  ...INTRANTS_AB.map((p, idx) => ({
+    id: 1000 + p.id,
+    produit: p.nom,
+    categorie: p.categorie,
+    quantite: [25, 8, 5, 0, 0, 0, 0, 0][idx] || 0,
+    unite: p.categorie.includes('Fongicide') || p.categorie.includes('Acaricide') ? 'kg' : (idx === 2 || idx === 4 ? 'L' : 'kg'),
+    seuil_alerte: [10, 10, 2, 1, 1, 1, 1, 1][idx] || 1,
+    fournisseur: idx % 2 === 0 ? "Coopérative Bio Sud" : "Agrobio Distribution",
+    date_achat: idx < 3 ? ["2025-03-15","2025-02-20","2025-04-10"][idx] : ""
+  })),
+  ...FERTILISANTS.map((f, idx) => ({
+    id: 2000 + f.id,
+    produit: f.nom,
+    categorie: f.type === "Organique" ? "Fertilisant" : "Amendement",
+    quantite: idx === 1 ? 1200 : 0,
+    unite: "kg",
+    seuil_alerte: idx === 1 ? 200 : 50,
+    fournisseur: "Compostière Régionale",
+    date_achat: idx === 1 ? "2025-01-05" : ""
+  }))
 ];
 
 const CERTIF_INIT = {
@@ -930,7 +948,7 @@ function Parcelles({ parcelles, setParcelles }) {
 }
 
 // ===================== REGISTRE INTRANTS =====================
-function RegistreIntrants({ interventions, setInterventions, parcelles }) {
+function RegistreIntrants({ interventions, setInterventions, parcelles, stock, setStock }) {
   const [modal, setModal] = useState(false);
   const [tab, setTab] = useState('registre');
   const [recherche, setRecherche] = useState('');
@@ -961,6 +979,17 @@ function RegistreIntrants({ interventions, setInterventions, parcelles }) {
     setModal(true);
   };
 
+  const decrementerStock = (nomProduit, dose) => {
+    // Extrait la valeur numérique de la dose (ex: "3 kg/ha" -> 3)
+    const match = String(dose).match(/[\d.,]+/);
+    if (!match) return;
+    const valeur = parseFloat(match[0].replace(',', '.'));
+    if (!valeur || isNaN(valeur)) return;
+    setStock(prev => prev.map(s =>
+      s.produit === nomProduit ? { ...s, quantite: Math.max(0, +(s.quantite - valeur).toFixed(2)) } : s
+    ));
+  };
+
   const enregistrer = () => {
     if (!form.date || !form.parcelle || !form.produit) return;
     const parc = parcelles.find(p => p.nom === form.parcelle);
@@ -968,6 +997,7 @@ function RegistreIntrants({ interventions, setInterventions, parcelles }) {
       setInterventions(interventions.map(i => i.id === editId ? { ...form, id: editId, culture: parc?.culture || i.culture } : i));
     } else {
       setInterventions([...interventions, { ...form, id: Date.now(), culture: parc?.culture || '' }]);
+      decrementerStock(form.produit, form.dose);
     }
     setModal(false);
     setEditId(null);
@@ -1172,6 +1202,11 @@ function RegistreIntrants({ interventions, setInterventions, parcelles }) {
               </div>
               {ecoute && <div style={{fontSize:'0.75rem', color:'var(--rouge-bio)', marginTop:4}}>🎙️ Écoute en cours… parlez maintenant</div>}
             </div>
+            {!editId && (
+              <div className="info-box" style={{marginBottom:0}}>
+                📦 La quantité indiquée dans "Dose appliquée" sera automatiquement déduite du stock du produit sélectionné.
+              </div>
+            )}
           </div>
         </Modal>
       )}
@@ -1702,7 +1737,7 @@ function App() {
         <div className="content">
           {module === 'dashboard' && <Dashboard parcelles={parcelles} interventions={interventions} />}
           {module === 'parcelles' && <Parcelles parcelles={parcelles} setParcelles={setParcelles} />}
-          {module === 'intrants' && <RegistreIntrants interventions={interventions} setInterventions={setInterventions} parcelles={parcelles} />}
+          {module === 'intrants' && <RegistreIntrants interventions={interventions} setInterventions={setInterventions} parcelles={parcelles} stock={stock} setStock={setStock} />}
           {module === 'stock' && <StockIntrants stock={stock} setStock={setStock} />}
           {module === 'certification' && <Certification />}
           {module === 'aides' && <AidesPAC />}
