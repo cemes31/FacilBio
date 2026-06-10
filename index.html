@@ -643,6 +643,13 @@ const INTERVENTIONS_INIT = [
   { id: 2, date: "2025-04-28", parcelle: "Les Terrasses", culture: "Vigne", produit: "Soufre mouillable", dose: "5 kg/ha", objectif: "Oïdium vigne", operateur: "Jean Martin" },
 ];
 
+const STOCK_INIT = [
+  { id: 1, produit: "Bouillie bordelaise", categorie: "Fongicide", quantite: 25, unite: "kg", seuil_alerte: 10, fournisseur: "Coopérative Bio Sud", date_achat: "2025-03-15" },
+  { id: 2, produit: "Soufre mouillable", categorie: "Fongicide", quantite: 8, unite: "kg", seuil_alerte: 10, fournisseur: "Agrobio Distribution", date_achat: "2025-02-20" },
+  { id: 3, produit: "Pyrèthre naturel", categorie: "Insecticide", quantite: 5, unite: "L", seuil_alerte: 2, fournisseur: "Coopérative Bio Sud", date_achat: "2025-04-10" },
+  { id: 4, produit: "Compost végétal", categorie: "Fertilisant", quantite: 1200, unite: "kg", seuil_alerte: 200, fournisseur: "Compostière Régionale", date_achat: "2025-01-05" },
+];
+
 const CERTIF_INIT = {
   organisme: "Ecocert",
   numero: "FR-BIO-01-2342",
@@ -927,7 +934,11 @@ function RegistreIntrants({ interventions, setInterventions, parcelles }) {
   const [modal, setModal] = useState(false);
   const [tab, setTab] = useState('registre');
   const [recherche, setRecherche] = useState('');
-  const [form, setForm] = useState({ date:'', parcelle:'', produit:'', dose:'', objectif:'', operateur:'' });
+  const [editId, setEditId] = useState(null);
+  const [confirmSuppr, setConfirmSuppr] = useState(null);
+  const [ecoute, setEcoute] = useState(false);
+  const formVide = { date:'', parcelle:'', produit:'', dose:'', objectif:'', operateur:'' };
+  const [form, setForm] = useState(formVide);
 
   const produitsFiltres = INTRANTS_AB.filter(p =>
     p.nom.toLowerCase().includes(recherche.toLowerCase()) ||
@@ -935,14 +946,59 @@ function RegistreIntrants({ interventions, setInterventions, parcelles }) {
     p.usages.toLowerCase().includes(recherche.toLowerCase())
   );
 
-  const ajouter = () => {
+  const ouvrirAjout = () => {
+    setEditId(null);
+    setForm(formVide);
+    setModal(true);
+  };
+
+  const ouvrirEdition = (intervention) => {
+    setEditId(intervention.id);
+    setForm({
+      date: intervention.date, parcelle: intervention.parcelle, produit: intervention.produit,
+      dose: intervention.dose, objectif: intervention.objectif, operateur: intervention.operateur
+    });
+    setModal(true);
+  };
+
+  const enregistrer = () => {
     if (!form.date || !form.parcelle || !form.produit) return;
     const parc = parcelles.find(p => p.nom === form.parcelle);
-    setInterventions([...interventions, {
-      ...form, id: Date.now(), culture: parc?.culture || ''
-    }]);
+    if (editId) {
+      setInterventions(interventions.map(i => i.id === editId ? { ...form, id: editId, culture: parc?.culture || i.culture } : i));
+    } else {
+      setInterventions([...interventions, { ...form, id: Date.now(), culture: parc?.culture || '' }]);
+    }
     setModal(false);
-    setForm({ date:'', parcelle:'', produit:'', dose:'', objectif:'', operateur:'' });
+    setEditId(null);
+    setForm(formVide);
+  };
+
+  const supprimer = (id) => {
+    setInterventions(interventions.filter(i => i.id !== id));
+    setConfirmSuppr(null);
+  };
+
+  // Dictée vocale pour le champ "objectif"
+  const lancerDictee = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("La dictée vocale n'est pas supportée par ce navigateur. Utilisez Chrome ou Edge.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'fr-FR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => setEcoute(true);
+    recognition.onend = () => setEcoute(false);
+    recognition.onerror = () => setEcoute(false);
+    recognition.onresult = (event) => {
+      const texte = event.results[0][0].transcript;
+      setForm(prev => ({ ...prev, objectif: prev.objectif ? prev.objectif + ' ' + texte : texte }));
+    };
+    recognition.start();
   };
 
   return (
@@ -957,14 +1013,14 @@ function RegistreIntrants({ interventions, setInterventions, parcelles }) {
         <div className="card">
           <div className="card-header">
             <div className="card-title">📋 Interventions phytosanitaires AB</div>
-            <button className="btn btn-primary" onClick={()=>setModal(true)}>+ Nouvelle intervention</button>
+            <button className="btn btn-primary" onClick={ouvrirAjout}>+ Nouvelle intervention</button>
           </div>
           <div className="info-box" style={{margin:'0 20px 0', borderRadius:'8px 8px 0 0'}}>
             💡 <strong>Rappel :</strong> En agriculture biologique, seuls les produits listés dans l'Annexe I du règlement UE 2021/1165 et disposant d'une AMM française sont autorisés.
           </div>
           <table>
             <thead>
-              <tr><th>Date</th><th>Parcelle</th><th>Culture</th><th>Produit AB utilisé</th><th>Dose</th><th>Objectif</th><th>Opérateur</th></tr>
+              <tr><th>Date</th><th>Parcelle</th><th>Culture</th><th>Produit AB utilisé</th><th>Dose</th><th>Objectif</th><th>Opérateur</th><th>Actions</th></tr>
             </thead>
             <tbody>
               {interventions.map(i => (
@@ -976,10 +1032,16 @@ function RegistreIntrants({ interventions, setInterventions, parcelles }) {
                   <td style={{fontSize:'0.82rem'}}>{i.dose}</td>
                   <td style={{fontSize:'0.82rem',color:'#666'}}>{i.objectif}</td>
                   <td style={{fontSize:'0.82rem'}}>{i.operateur}</td>
+                  <td>
+                    <div style={{display:'flex',gap:6}}>
+                      <button className="btn btn-outline btn-sm" onClick={()=>ouvrirEdition(i)}>✏️</button>
+                      <button className="btn btn-danger btn-sm" onClick={()=>setConfirmSuppr(i.id)}>🗑️</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {interventions.length === 0 && (
-                <tr><td colSpan="7"><div className="empty-state"><div className="empty-icon">🌿</div><div className="empty-text">Aucune intervention enregistrée</div></div></td></tr>
+                <tr><td colSpan="8"><div className="empty-state"><div className="empty-icon">🌿</div><div className="empty-text">Aucune intervention enregistrée</div></div></td></tr>
               )}
             </tbody>
           </table>
@@ -1057,8 +1119,8 @@ function RegistreIntrants({ interventions, setInterventions, parcelles }) {
       )}
 
       {modal && (
-        <Modal title="🌿 Nouvelle intervention AB" onClose={()=>setModal(false)}
-          footer={<><button className="btn btn-outline" onClick={()=>setModal(false)}>Annuler</button><button className="btn btn-primary" onClick={ajouter}>Enregistrer</button></>}>
+        <Modal title={editId ? "✏️ Modifier l'intervention" : "🌿 Nouvelle intervention AB"} onClose={()=>{setModal(false); setEditId(null);}}
+          footer={<><button className="btn btn-outline" onClick={()=>{setModal(false); setEditId(null);}}>Annuler</button><button className="btn btn-primary" onClick={enregistrer}>Enregistrer</button></>}>
           <div className="form-grid">
             <div className="form-row">
               <div className="form-group">
@@ -1092,9 +1154,190 @@ function RegistreIntrants({ interventions, setInterventions, parcelles }) {
             </div>
             <div className="form-group">
               <label>Objectif / Cible visée</label>
-              <input value={form.objectif} onChange={e=>setForm({...form,objectif:e.target.value})} placeholder="Ex: Mildiou tomate, pucerons…" />
+              <div style={{display:'flex', gap:8}}>
+                <input style={{flex:1}} value={form.objectif} onChange={e=>setForm({...form,objectif:e.target.value})} placeholder="Ex: Mildiou tomate, pucerons…" />
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={lancerDictee}
+                  style={{
+                    background: ecoute ? 'var(--rouge-bio)' : 'var(--vert-pale)',
+                    color: ecoute ? 'white' : 'var(--vert-fonce)',
+                    border: 'none', minWidth: 44
+                  }}
+                  title="Dictée vocale"
+                >
+                  {ecoute ? '🔴' : '🎙️'}
+                </button>
+              </div>
+              {ecoute && <div style={{fontSize:'0.75rem', color:'var(--rouge-bio)', marginTop:4}}>🎙️ Écoute en cours… parlez maintenant</div>}
             </div>
           </div>
+        </Modal>
+      )}
+
+      {confirmSuppr && (
+        <Modal title="🗑️ Confirmer la suppression" onClose={()=>setConfirmSuppr(null)}
+          footer={<><button className="btn btn-outline" onClick={()=>setConfirmSuppr(null)}>Annuler</button><button className="btn btn-danger" onClick={()=>supprimer(confirmSuppr)}>Supprimer</button></>}>
+          <p style={{fontSize:'0.9rem'}}>Voulez-vous vraiment supprimer cette intervention du registre ? Cette action est irréversible.</p>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ===================== STOCK INTRANTS AB =====================
+function StockIntrants({ stock, setStock }) {
+  const [modal, setModal] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [confirmSuppr, setConfirmSuppr] = useState(null);
+  const formVide = { produit:'', categorie:'Fongicide', quantite:'', unite:'kg', seuil_alerte:'', fournisseur:'', date_achat:'' };
+  const [form, setForm] = useState(formVide);
+
+  const ouvrirAjout = () => {
+    setEditId(null);
+    setForm(formVide);
+    setModal(true);
+  };
+
+  const ouvrirEdition = (item) => {
+    setEditId(item.id);
+    setForm({ ...item, quantite: String(item.quantite), seuil_alerte: String(item.seuil_alerte) });
+    setModal(true);
+  };
+
+  const enregistrer = () => {
+    if (!form.produit || form.quantite === '') return;
+    const data = { ...form, quantite: parseFloat(form.quantite) || 0, seuil_alerte: parseFloat(form.seuil_alerte) || 0 };
+    if (editId) {
+      setStock(stock.map(s => s.id === editId ? { ...data, id: editId } : s));
+    } else {
+      setStock([...stock, { ...data, id: Date.now() }]);
+    }
+    setModal(false);
+    setEditId(null);
+    setForm(formVide);
+  };
+
+  const supprimer = (id) => {
+    setStock(stock.filter(s => s.id !== id));
+    setConfirmSuppr(null);
+  };
+
+  const ajusterQuantite = (id, delta) => {
+    setStock(stock.map(s => s.id === id ? { ...s, quantite: Math.max(0, +(s.quantite + delta).toFixed(2)) } : s));
+  };
+
+  const enAlerte = stock.filter(s => s.quantite <= s.seuil_alerte);
+
+  return (
+    <div>
+      {enAlerte.length > 0 && (
+        <div className="info-box" style={{background:'#ffebee', borderColor:'#ffcdd2', color:'#c62828', marginBottom:16}}>
+          ⚠️ <strong>{enAlerte.length} produit(s) en stock bas :</strong> {enAlerte.map(s => s.produit).join(', ')}
+        </div>
+      )}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">📦 Stock d'intrants AB</div>
+          <button className="btn btn-primary" onClick={ouvrirAjout}>+ Ajouter un produit</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Produit</th><th>Catégorie</th><th>Quantité</th><th>Seuil alerte</th><th>Fournisseur</th><th>Achat</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {stock.map(s => (
+              <tr key={s.id}>
+                <td><strong>{s.produit}</strong></td>
+                <td style={{fontSize:'0.82rem',color:'#666'}}>{s.categorie}</td>
+                <td>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <button className="btn btn-outline btn-sm" onClick={()=>ajusterQuantite(s.id,-1)}>−</button>
+                    <span style={{
+                      fontWeight:600,
+                      color: s.quantite <= s.seuil_alerte ? 'var(--rouge-bio)' : 'var(--vert-fonce)',
+                      minWidth:60, textAlign:'center'
+                    }}>{s.quantite} {s.unite}</span>
+                    <button className="btn btn-outline btn-sm" onClick={()=>ajusterQuantite(s.id,1)}>+</button>
+                  </div>
+                </td>
+                <td style={{fontSize:'0.82rem',color:'#888'}}>{s.seuil_alerte} {s.unite}</td>
+                <td style={{fontSize:'0.82rem',color:'#666'}}>{s.fournisseur}</td>
+                <td style={{fontSize:'0.78rem',color:'#888'}}>{s.date_achat ? new Date(s.date_achat).toLocaleDateString('fr-FR') : '—'}</td>
+                <td>
+                  <div style={{display:'flex',gap:6}}>
+                    <button className="btn btn-outline btn-sm" onClick={()=>ouvrirEdition(s)}>✏️</button>
+                    <button className="btn btn-danger btn-sm" onClick={()=>setConfirmSuppr(s.id)}>🗑️</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {stock.length === 0 && (
+              <tr><td colSpan="7"><div className="empty-state"><div className="empty-icon">📦</div><div className="empty-text">Aucun produit en stock</div></div></td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {modal && (
+        <Modal title={editId ? "✏️ Modifier le produit" : "📦 Ajouter au stock"} onClose={()=>{setModal(false); setEditId(null);}}
+          footer={<><button className="btn btn-outline" onClick={()=>{setModal(false); setEditId(null);}}>Annuler</button><button className="btn btn-primary" onClick={enregistrer}>Enregistrer</button></>}>
+          <div className="form-grid">
+            <div className="form-group">
+              <label>Nom du produit *</label>
+              <input value={form.produit} onChange={e=>setForm({...form,produit:e.target.value})} placeholder="Ex: Bouillie bordelaise" />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Catégorie</label>
+                <select value={form.categorie} onChange={e=>setForm({...form,categorie:e.target.value})}>
+                  <option>Fongicide</option>
+                  <option>Insecticide</option>
+                  <option>Fertilisant</option>
+                  <option>Amendement</option>
+                  <option>Autre</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Unité</label>
+                <select value={form.unite} onChange={e=>setForm({...form,unite:e.target.value})}>
+                  <option>kg</option>
+                  <option>L</option>
+                  <option>g</option>
+                  <option>mL</option>
+                  <option>unité(s)</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Quantité en stock *</label>
+                <input type="number" step="0.1" value={form.quantite} onChange={e=>setForm({...form,quantite:e.target.value})} placeholder="Ex: 25" />
+              </div>
+              <div className="form-group">
+                <label>Seuil d'alerte</label>
+                <input type="number" step="0.1" value={form.seuil_alerte} onChange={e=>setForm({...form,seuil_alerte:e.target.value})} placeholder="Ex: 10" />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Fournisseur</label>
+                <input value={form.fournisseur} onChange={e=>setForm({...form,fournisseur:e.target.value})} placeholder="Ex: Coopérative Bio Sud" />
+              </div>
+              <div className="form-group">
+                <label>Date d'achat</label>
+                <input type="date" value={form.date_achat} onChange={e=>setForm({...form,date_achat:e.target.value})} />
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {confirmSuppr && (
+        <Modal title="🗑️ Confirmer la suppression" onClose={()=>setConfirmSuppr(null)}
+          footer={<><button className="btn btn-outline" onClick={()=>setConfirmSuppr(null)}>Annuler</button><button className="btn btn-danger" onClick={()=>supprimer(confirmSuppr)}>Supprimer</button></>}>
+          <p style={{fontSize:'0.9rem'}}>Voulez-vous vraiment supprimer ce produit du stock ? Cette action est irréversible.</p>
         </Modal>
       )}
     </div>
@@ -1360,6 +1603,7 @@ const MODULES = [
   { id: 'dashboard', label: 'Tableau de bord', icon: '🏠' },
   { id: 'parcelles', label: 'Mes parcelles', icon: '🗺️' },
   { id: 'intrants', label: 'Registre intrants', icon: '🌿' },
+  { id: 'stock', label: 'Stock intrants', icon: '📦' },
   { id: 'certification', label: 'Certification AB', icon: '🏆' },
   { id: 'aides', label: 'Aides PAC Bio', icon: '💶' },
   { id: 'conseiller', label: 'Conseiller IA', icon: '🤖' },
@@ -1408,11 +1652,13 @@ function App() {
   const [module, setModule] = useState('dashboard');
   const [parcelles, setParcelles] = useState(PARCELLES_INIT);
   const [interventions, setInterventions] = useState(INTERVENTIONS_INIT);
+  const [stock, setStock] = useState(STOCK_INIT);
 
   const titres = {
     dashboard: 'Tableau de bord',
     parcelles: 'Mes parcelles',
     intrants: 'Registre des intrants',
+    stock: 'Stock d\'intrants AB',
     certification: 'Certification AB',
     aides: 'Aides PAC Biologique',
     conseiller: 'Conseiller IA',
@@ -1457,6 +1703,7 @@ function App() {
           {module === 'dashboard' && <Dashboard parcelles={parcelles} interventions={interventions} />}
           {module === 'parcelles' && <Parcelles parcelles={parcelles} setParcelles={setParcelles} />}
           {module === 'intrants' && <RegistreIntrants interventions={interventions} setInterventions={setInterventions} parcelles={parcelles} />}
+          {module === 'stock' && <StockIntrants stock={stock} setStock={setStock} />}
           {module === 'certification' && <Certification />}
           {module === 'aides' && <AidesPAC />}
           {module === 'conseiller' && <ConseillerIA />}
