@@ -618,15 +618,23 @@ const PARCELLES_INIT = [
   { id: 4, nom: "Les Terrasses", surface: 1.9, culture: "Vigne", statut: "conversion", debut_conversion: "2023-11-01", organisme: "Certipaq" },
 ];
 
+// Substances actives reconnues "Utilisable en Agriculture Biologique" (Annexe I règlement UE 2021/1165)
+// ⚠️ Liste générique de substances autorisées à titre indicatif.
+// Le NOM COMMERCIAL exact et le numéro AMM doivent être vérifiés sur ephy.anses.fr (filtre "Utilisable en agriculture biologique")
+// Source réglementaire : Règlement d'exécution (UE) 2021/1165 - Annexe I
 const INTRANTS_AB = [
-  { id: 1, nom: "Bouillie bordelaise", substance: "Sulfate de cuivre", categorie: "Fongicide", usages: "Mildiou vigne, tomate", amm: "2120058" },
-  { id: 2, nom: "Soufre mouillable", substance: "Soufre", categorie: "Fongicide / Acaricide", usages: "Oïdium, acariens", amm: "9900282" },
-  { id: 3, nom: "Pyrèthre naturel", substance: "Pyréthrine naturelle", categorie: "Insecticide", usages: "Pucerons, thrips", amm: "8900276" },
-  { id: 4, nom: "Spinosad", substance: "Spinosad", categorie: "Insecticide", usages: "Mouche cerise, chenilles", amm: "2100156" },
-  { id: 5, nom: "Huile essentielle d'orange", substance: "Limonène", categorie: "Insecticide", usages: "Pucerons, aleurodes", amm: "2150089" },
-  { id: 6, nom: "Bacillus thuringiensis", substance: "B. thuringiensis", categorie: "Insecticide bio", usages: "Chenilles, larves", amm: "9600451" },
-  { id: 7, nom: "Kaolin", substance: "Silicate d'aluminium", categorie: "Répulsif", usages: "Cicadelle, mouche olive", amm: "2110342" },
-  { id: 8, nom: "Bicarbonate de potassium", substance: "K-HCO3", categorie: "Fongicide", usages: "Oïdium", amm: "2130198" },
+  { id: 1, substance: "Cuivre (sous forme de sulfate, oxychlorure, hydroxyde...)", categorie: "Fongicide", usages: "Mildiou (vigne, pomme de terre, tomate), tavelure" },
+  { id: 2, substance: "Soufre", categorie: "Fongicide / Acaricide", usages: "Oïdium, acariens" },
+  { id: 3, substance: "Pyréthrines extraites de Chrysanthemum cinerariaefolium", categorie: "Insecticide", usages: "Pucerons, thrips, aleurodes" },
+  { id: 4, substance: "Spinosad", categorie: "Insecticide", usages: "Mouche de la cerise, chenilles, thrips" },
+  { id: 5, substance: "Huiles végétales (ex: huile essentielle d'orange douce)", categorie: "Insecticide / Acaricide", usages: "Pucerons, aleurodes, acariens" },
+  { id: 6, substance: "Bacillus thuringiensis", categorie: "Insecticide biologique", usages: "Chenilles et larves de lépidoptères" },
+  { id: 7, substance: "Kaolin calciné", categorie: "Répulsif / Barrière physique", usages: "Cicadelles, mouche de l'olive, carpocapse" },
+  { id: 8, substance: "Bicarbonate de potassium / Bicarbonate de soude", categorie: "Fongicide", usages: "Oïdium" },
+  { id: 9, substance: "Phosphate ferrique (fer III)", categorie: "Molluscicide", usages: "Limaces et escargots" },
+  { id: 10, substance: "Huiles de paraffine", categorie: "Insecticide / Acaricide", usages: "Cochenilles, acariens, oeufs d'hivernation" },
+  { id: 11, substance: "Extrait de Quassia amara", categorie: "Insecticide", usages: "Pucerons, larves de tenthrèdes" },
+  { id: 12, substance: "Laminarine (extrait d'algues)", categorie: "Stimulateur de défense", usages: "Stimulation des défenses naturelles de la plante" },
 ];
 
 const FERTILISANTS = [
@@ -639,33 +647,14 @@ const FERTILISANTS = [
 ];
 
 const INTERVENTIONS_INIT = [
-  { id: 1, date: "2025-05-12", parcelle: "La Côte Sud", culture: "Maraîchage", produit: "Bouillie bordelaise", dose: "3 kg/ha", objectif: "Mildiou tomate", operateur: "Jean Martin" },
-  { id: 2, date: "2025-04-28", parcelle: "Les Terrasses", culture: "Vigne", produit: "Soufre mouillable", dose: "5 kg/ha", objectif: "Oïdium vigne", operateur: "Jean Martin" },
+  { id: 1, date: "2025-05-12", parcelle: "La Côte Sud", culture: "Maraîchage", produit: "Cuivre (sous forme de sulfate, oxychlorure, hydroxyde...)", dose: "3 kg/ha", objectif: "Mildiou tomate", operateur: "Jean Martin" },
+  { id: 2, date: "2025-04-28", parcelle: "Les Terrasses", culture: "Vigne", produit: "Soufre", dose: "5 kg/ha", objectif: "Oïdium vigne", operateur: "Jean Martin" },
 ];
 
-// Stock généré automatiquement à partir des produits AB (INTRANTS_AB) et fertilisants (FERTILISANTS)
-// Quantités initiales à 0 = à compléter par l'utilisateur, sauf exemples pré-remplis
+// Stock de l'exploitation : VIDE par défaut, l'agriculteur ajoute les produits qu'il possède réellement.
+// Un seul exemple factice pour illustrer le fonctionnement (clairement identifiable comme exemple).
 const STOCK_INIT = [
-  ...INTRANTS_AB.map((p, idx) => ({
-    id: 1000 + p.id,
-    produit: p.nom,
-    categorie: p.categorie,
-    quantite: [25, 8, 5, 0, 0, 0, 0, 0][idx] || 0,
-    unite: p.categorie.includes('Fongicide') || p.categorie.includes('Acaricide') ? 'kg' : (idx === 2 || idx === 4 ? 'L' : 'kg'),
-    seuil_alerte: [10, 10, 2, 1, 1, 1, 1, 1][idx] || 1,
-    fournisseur: idx % 2 === 0 ? "Coopérative Bio Sud" : "Agrobio Distribution",
-    date_achat: idx < 3 ? ["2025-03-15","2025-02-20","2025-04-10"][idx] : ""
-  })),
-  ...FERTILISANTS.map((f, idx) => ({
-    id: 2000 + f.id,
-    produit: f.nom,
-    categorie: f.type === "Organique" ? "Fertilisant" : "Amendement",
-    quantite: idx === 1 ? 1200 : 0,
-    unite: "kg",
-    seuil_alerte: idx === 1 ? 200 : 50,
-    fournisseur: "Compostière Régionale",
-    date_achat: idx === 1 ? "2025-01-05" : ""
-  }))
+  { id: 1, produit: "Exemple : Bouillie bordelaise (cuivre)", categorie: "Fongicide", quantite: 25, unite: "kg", seuil_alerte: 10, fournisseur: "Mon fournisseur habituel", date_achat: "" },
 ];
 
 const CERTIF_INIT = {
@@ -959,8 +948,8 @@ function RegistreIntrants({ interventions, setInterventions, parcelles, stock, s
   const [form, setForm] = useState(formVide);
 
   const produitsFiltres = INTRANTS_AB.filter(p =>
-    p.nom.toLowerCase().includes(recherche.toLowerCase()) ||
     p.substance.toLowerCase().includes(recherche.toLowerCase()) ||
+    p.categorie.toLowerCase().includes(recherche.toLowerCase()) ||
     p.usages.toLowerCase().includes(recherche.toLowerCase())
   );
 
@@ -1086,7 +1075,10 @@ function RegistreIntrants({ interventions, setInterventions, parcelles, stock, s
           </div>
           <div className="card-body">
             <div className="info-box">
-              ✅ Tous ces produits sont <strong>autorisés en AB</strong> conformément à l'Annexe I du règlement UE 2021/1165 et disposent d'une AMM pour la France. Vérifiez toujours la colonne "Production Biologique" sur e-phy.anses.fr avant utilisation.
+              ✅ Ces <strong>substances actives</strong> figurent à l'Annexe I du règlement UE 2021/1165 et sont reconnues utilisables en agriculture biologique.
+            </div>
+            <div className="info-box" style={{background:'#fff8e1', borderColor:'#f9a825', color:'#5d4037'}}>
+              ⚠️ <strong>Important :</strong> cette liste indique les substances autorisées à titre indicatif, mais ne remplace pas une vérification du <strong>produit commercial précis</strong> (nom, AMM, dose, usages exacts) sur <a href="https://ephy.anses.fr/" target="_blank" rel="noopener" style={{color:'#e65100', fontWeight:600}}>ephy.anses.fr</a> (filtre "Utilisable en agriculture biologique"). Seul e-phy fait foi.
             </div>
             <div className="search-box">
               <span className="search-icon">🔍</span>
@@ -1097,13 +1089,12 @@ function RegistreIntrants({ interventions, setInterventions, parcelles, stock, s
                 <div key={p.id} className="produit-item">
                   <div className="produit-ab">🌿</div>
                   <div className="produit-info">
-                    <div className="produit-nom">{p.nom}</div>
-                    <div className="produit-substance">Substance : {p.substance} · Catégorie : {p.categorie}</div>
+                    <div className="produit-nom">{p.substance}</div>
+                    <div className="produit-substance">Catégorie : {p.categorie}</div>
                     <div style={{fontSize:'0.78rem',color:'var(--vert-clair)',marginTop:2}}>Usages : {p.usages}</div>
                   </div>
                   <div style={{textAlign:'right'}}>
-                    <span className="badge badge-ab">AMM {p.amm}</span>
-                    <div style={{fontSize:'0.7rem',color:'#aaa',marginTop:4}}>e-phy vérifié</div>
+                    <a href="https://ephy.anses.fr/" target="_blank" rel="noopener" className="badge badge-ab" style={{textDecoration:'none'}}>🔍 Vérifier sur e-phy</a>
                   </div>
                 </div>
               ))}
@@ -1169,7 +1160,7 @@ function RegistreIntrants({ interventions, setInterventions, parcelles, stock, s
               <label>Produit AB utilisé *</label>
               <select value={form.produit} onChange={e=>setForm({...form,produit:e.target.value})}>
                 <option value="">-- Choisir un produit autorisé AB --</option>
-                {INTRANTS_AB.map(p => <option key={p.id} value={p.nom}>{p.nom} ({p.categorie})</option>)}
+                {INTRANTS_AB.map(p => <option key={p.id} value={p.substance}>{p.substance} ({p.categorie})</option>)}
               </select>
             </div>
             <div className="form-row">
